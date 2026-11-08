@@ -86,6 +86,48 @@ DAMAGE = {
 }
 
 
+# ---------------------------------------------------------------------
+# YOUR HAND-WRITTEN OPENING SCENES
+# These are shown first, exactly as written. Each choice has:
+#   "text"    -> the button the player clicks
+#   "outcome" -> "safe", "hurt" or "death" (what happens to the player)
+#   "next"    -> which scene comes next. None = Gemini takes over from here.
+# A scene with "status": "dead" ends the game.
+# ---------------------------------------------------------------------
+
+game_story = {
+    "turn_1": {
+        "story": "You are at home on the couch, eating chips and buttered popcorn while watching a TV show. However, you get an alert on your phone with the message “Warning! A catastrophic event is unfolding. A zombie outbreak has occurred globally, and more than 40 million people have been infected by an unknown fungal virus.” You glanced at your phone with such concern and confusion that you turned on the news outlet; the reporters' faces were pale because on the screen there was blood splattered on the camera with a zombie biting a person's neck. You get up from the couch, tossing the popcorn and chip bag to the side, forcing you to think fast.",
+        "choices": [
+            {"text": "Go to your room and get items you would desperately need to survive", "outcome": "safe", "next": "turn_2_A"},
+            {"text": "Lock yourself inside the bathroom", "outcome": "safe", "next": "turn_2_B"},
+            {"text": "Disregard the alert and go to sleep because you think it’s all a dream", "outcome": "death", "next": "turn_2_C"},
+        ],
+    },
+    "turn_2_A": {
+        "story": "You scramble to your room, pick up a backpack lying on the floor, and dump clothes and water bottles into it to stay hydrated and fresh throughout your journey. You also grab a couple of other snacks from the counter drawer. When you check your cellphone, you find out that the nearest shelter is an 11-hour walk away. You sit there, thinking and analyzing whether it's truly possible to get there with so many people getting infected every hour. Then suddenly, you hear a sharp tapping sound echoing directly against your bedroom window. What do you do in this situation?",
+        "choices": [
+            {"text": "Run to the roof", "outcome": "safe", "next": None},
+            {"text": "Hide in the closet", "outcome": "hurt", "next": None},
+            {"text": "Call for help", "outcome": "death", "next": None},
+        ],
+    },
+    "turn_2_B": {
+        "story": "You lock yourself inside the bathroom, hoping that the zombies won't find you. You hear scratching and banging on the door, and you realize that you need to find a way out. You look around the bathroom and see a small window that leads to the roof. What do you do?",
+        "choices": [
+            {"text": "Stay in the bathroom and wait for help", "outcome": "death", "next": None},
+            {"text": "Climb out the window to the roof", "outcome": "safe", "next": None},
+            {"text": "Try to break the door down and escape", "outcome": "hurt", "next": None},
+        ],
+    },
+    "turn_2_C": {
+        "story": "You disregard the alert and go to sleep, thinking it's all a dream. However, you wake up to the sound of zombies breaking into your house. You try to escape, but you are bitten and infected. You have failed to survive.",
+        "choices": [],
+        "status": "dead",
+    },
+}
+
+
 # =====================================================================
 # 2. THE STORY RULES GEMINI FOLLOWS
 # =====================================================================
@@ -95,6 +137,10 @@ def pick_this_game():
     game = {}
     for key, value in STORY_SETTINGS.items():
         game[key] = random.choice(value) if isinstance(value, list) else value
+    # The hand-written opening scenes happen at home and the player is alone,
+    # so these two settings are fixed to match them.
+    game["starting_location"] = "your home in Buffalo, New York"
+    game["companion"] = "nobody, you are alone"
     return game
 
 
@@ -115,6 +161,11 @@ STORY SETTINGS FOR THIS GAME:
 - Tone: {game["tone"]}
 - SECRET TWIST (never say it directly; hint at it, then reveal it in the
   second half of the story): {game["secret_twist"]}
+
+OPENING SCENES:
+- The first two scenes were already written by a human (they are in the
+  conversation). Continue naturally from the last scene. Do not repeat,
+  rewrite, or contradict them.
 
 WRITING STYLE (very important):
 - 2 to 3 sentences per scene. Never more than 50 words.
@@ -287,25 +338,43 @@ def take_turn(player_message, ending=None):
     st.session_state.turns.append(turn)
     return True
 
-game_story = {
-    "turn 1": {
-        "story": " You are at home on the couch, eating chips and buttered popcorn while watching a TV show. However, you get an alert on your phone with the message “Warning! A catastrophic event is unfolding. A zombie outbreak has occurred globally, and more than 40 million people have been infected by an unknown fungal virus.” You glanced at your phone with such concern and confusion that you turned on the news outlet; the reporters' faces were pale because on the screen there was blood splattered on the camera with a zombie biting a person's neck. You get up from the couch, tossing the popcorn and chip bag to the side, forcing you to think fast.",
-        "choices": ["Go to your room and get items you would desperately need to survive", "Lock yourself inside the bathroom", "Disregard the alert and go to sleep because you think it’s all a dream"]
-    }, 
-}
-"turn_2_A": {
-    "story": "You scramble to your room, pick up a backpack lying on the floor, and dump clothes and water bottles into it to stay hydrated and fresh throughout your journey. You also grab a couple of other snacks from the counter drawer. When you check your cellphone, you find out that the nearest shelter is an 11-hour walk away. You sit there, thinking and analyzing whether it's truly possible to get there with so many people getting infected every hour. Then suddenly, you hear a sharp tapping sound echoing directly against your bedroom window. What do you do in this situation?",
-    "choices": ["Run to the roof", "Hide in the closet", "Call for help"]
-},
-"turn_2_B": {
-    "story": "You lock yourself inside the bathroom, hoping that the zombies won't find you. You hear scratching and banging on the door, and you realize that you need to find a way out. You look around the bathroom and see a small window that leads to the roof. What do you do?",
-    "choices": ["Stay in the bathroom and wait for help", "Climb out the window to the roof", "Try to break the door down and escape"]
-},
-"turn_2_C": {
-    "story": "You disregard the alert and go to sleep, thinking it's all a dream. However, you wake up to the sound of zombies breaking into your house. You try to escape, but you are bitten and infected. You have failed to survive.",
-    "choices": [],
-    Status: "dead"
-} 
+
+# =====================================================================
+# 4b. THE HAND-WRITTEN SCENES (no Gemini needed for these)
+# =====================================================================
+
+def scripted_turn(scene_id):
+    """Turn one entry of game_story into a Turn the page can show."""
+    scene = game_story[scene_id]
+    return Turn(
+        story=scene["story"].strip(),
+        choices=[Choice(text=c["text"], outcome=c["outcome"]) for c in scene["choices"]],
+    )
+
+
+def play_scripted_scene(scene_id, player_message, ending=None):
+    """Show one of YOUR scenes and save it to the history so Gemini
+    knows what already happened when it takes over."""
+    add_message("user", player_message)
+    turn = scripted_turn(scene_id)
+    add_message("model", turn.model_dump_json())
+    st.session_state.turns.append(turn)
+    st.session_state.scene = scene_id
+    if ending:
+        st.session_state.ending = ending
+
+
+def scripted_next_scene(choice):
+    """Which of YOUR scenes comes after this choice? None = Gemini takes over."""
+    scene_id = st.session_state.get("scene")
+    if scene_id is None:
+        return None
+    for option in game_story[scene_id]["choices"]:
+        if option["text"] == choice.text:
+            return option.get("next")
+    return None
+
+
 def story_stage(choices_made):
     """Tell Gemini where we are in the story so it doesn't rush the ending."""
     left = CHOICES_TO_SURVIVE - choices_made
@@ -336,7 +405,7 @@ def make_choice(choice):
             result = f"The player got hurt and lost {damage} health (now {new_health})."
             ending = None
     else:
-        result = "Nothing bad happened. The player is safe for now."
+        result = "Nothing bad happens. The player is safe for now."
         ending = None
 
     # Last choice and still alive -> they made it!
@@ -349,10 +418,24 @@ def make_choice(choice):
         f"OUTCOME: {result}\n"
         f"This was choice {choices_made} of {CHOICES_TO_SURVIVE}."
     )
-    if ending is None:
-        message += "\n" + story_stage(choices_made) + " Give 3 new choices."
 
-    if take_turn(message, ending):
+    # Is the next scene one of YOUR hand-written scenes?
+    next_scene = scripted_next_scene(choice)
+    scripted_dead = next_scene is not None and game_story[next_scene].get("status") == "dead"
+    if next_scene is not None and (ending is None or scripted_dead):
+        if scripted_dead:
+            ending = "dead"
+        play_scripted_scene(next_scene, message, ending)
+        success = True
+    else:
+        # Gemini writes the next scene
+        if ending is None:
+            message += "\n" + story_stage(choices_made) + " Give 3 new choices."
+        success = take_turn(message, ending)
+        if success:
+            st.session_state.scene = None   # from now on, no more scripted scenes
+
+    if success:
         st.session_state.health = max(0, st.session_state.health - damage)
         st.session_state.picks.append({"text": choice.text, "outcome": choice.outcome, "damage": damage})
 
@@ -474,19 +557,25 @@ if "history" not in st.session_state:
     st.session_state.picks = []     # what the player picked + what happened
     st.session_state.health = 100
     st.session_state.ending = None  # None, "dead", or "survived"
+    st.session_state.scene = None   # which hand-written scene we're on (None = Gemini's turn)
 
 # ----- START SCREEN -----
 if not st.session_state.turns:
     st.write(
         "The outbreak started this morning. The city is falling. "
         f"Make **{CHOICES_TO_SURVIVE} choices** and stay alive to reach the rescue point. "
-        "Every turn, one choice is safe, one will hurt you, and one will kill you. Choose carefully."
+        "In most scenes, one choice is safe, one will hurt you, and one will kill you. Choose carefully."
     )
     name = st.text_input("Your survivor's name", "Alex")
     if st.button("Start the game", type="primary"):
         st.session_state.game = pick_this_game()
         st.session_state.prompt = build_prompt(st.session_state.game)
-        take_turn(f"Start the game. The player's name is {name}. Write the opening scene.")
+        # The opening scene is YOUR hand-written turn_1 (no Gemini call needed)
+        play_scripted_scene(
+            "turn_1",
+            f"Start the game. The player's name is {name}. "
+            "The opening scene is already written; continue from it.",
+        )
         st.rerun()
 
 # ----- GAME SCREEN -----
