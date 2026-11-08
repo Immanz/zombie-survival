@@ -287,7 +287,25 @@ def take_turn(player_message, ending=None):
     st.session_state.turns.append(turn)
     return True
 
-
+game_story = {
+    "turn 1": {
+        "story": " You are at home on the couch, eating chips and buttered popcorn while watching a TV show. However, you get an alert on your phone with the message “Warning! A catastrophic event is unfolding. A zombie outbreak has occurred globally, and more than 40 million people have been infected by an unknown fungal virus.” You glanced at your phone with such concern and confusion that you turned on the news outlet; the reporters' faces were pale because on the screen there was blood splattered on the camera with a zombie biting a person's neck. You get up from the couch, tossing the popcorn and chip bag to the side, forcing you to think fast.",
+        "choices": ["Go to your room and get items you would desperately need to survive", "Lock yourself inside the bathroom", "Disregard the alert and go to sleep because you think it’s all a dream"]
+    }, 
+}
+    "turn_2_A": {
+        "story": "You scramble to your room, pick up a backpack lying on the floor, and dump clothes and water bottles into it to stay hydrated and fresh throughout your journey. You also grab a couple of other snacks from the counter drawer. When you check your cellphone, you find out that the nearest shelter is an 11-hour walk away. You sit there, thinking and analyzing whether it's truly possible to get there with so many people getting infected every hour. Then suddenly, you hear a sharp tapping sound echoing directly against your bedroom window. What do you do in this situation?",
+        "choices": ["Run to the roof", "Hide in the closet", "Call for help"]
+    },
+    "turn_2_B": {
+        "story": "You lock yourself inside the bathroom, hoping that the zombies won't find you. You hear scratching and banging on the door, and you realize that you need to find a way out. You look around the bathroom and see a small window that leads to the roof. What do you do?",
+        "choices": ["Stay in the bathroom and wait for help", "Climb out the window to the roof", "Try to break the door down and escape"]
+    },
+    "turn_2_C": {
+        "story": "You disregard the alert and go to sleep, thinking it's all a dream. However, you wake up to the sound of zombies breaking into your house. You try to escape, but you are bitten and infected. You have failed to survive.",
+        "choices": [],
+        Status: "dead"
+    } 
 def story_stage(choices_made):
     """Tell Gemini where we are in the story so it doesn't rush the ending."""
     left = CHOICES_TO_SURVIVE - choices_made
