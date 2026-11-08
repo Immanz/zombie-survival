@@ -6,6 +6,7 @@ Run with:  streamlit run app.py
 import os
 import random
 import time
+from pathlib import Path
 from typing import Literal
 
 import streamlit as st
@@ -30,6 +31,12 @@ MODELS = [
     "gemini-3.8-flash",
 ]
 SECONDS_PER_TRY = 20   # give up on a model after this many seconds and try the next
+
+# End-screen clips. Put your files in a folder called "assets" next to app.py.
+# They can be .gif or .mp4. If a file is missing, a built-in drawing is shown instead.
+ASSETS_FOLDER = Path(__file__).parent / "assets"
+LOSE_CLIP = "lose.gif"    # shown when the player dies
+WIN_CLIP = "win.gif"      # shown when the player survives
 
 
 # ---------------------------------------------------------------------
@@ -133,6 +140,9 @@ WHEN THE PLAYER PICKS:
 - If told the player SURVIVED: write a short, exciting escape ending (max 50 words)
   and give an empty list of choices.
 - The game lasts {CHOICES_TO_SURVIVE} choices. Slowly move toward the goal.
+- VERY IMPORTANT: the player must NOT reach the goal, board the helicopter,
+  or escape until you are told they SURVIVED. Until then, always add a new
+  obstacle and give 3 new choices. Never write "you survived" early.
 """
 
 
@@ -251,11 +261,43 @@ def take_turn(player_message, ending=None):
         turn.choices = []                       # the game is over: no more choices
         st.session_state.ending = ending
     else:
+        if len(turn.choices) < 3:
+            # Gemini forgot the choices (or ended the story early) -> ask once more
+            try:
+                retry_history = st.session_state.history + [
+                    types.Content(role="model", parts=[types.Part(text=turn.model_dump_json())]),
+                    types.Content(role="user", parts=[types.Part(text=(
+                        "The game is NOT over. The player has not escaped yet. "
+                        "Rewrite that scene with a new obstacle and give exactly 3 choices."))]),
+                ]
+                with st.spinner("The story takes a turn..."):
+                    turn = ask_gemini(retry_history)
+            except Exception:
+                pass
+        if len(turn.choices) < 3:
+            # Still nothing -> backup choices so the game never gets stuck
+            turn.choices = [
+                Choice(text="Hide and wait", outcome="safe"),
+                Choice(text="Push forward fast", outcome="hurt"),
+                Choice(text="Open the nearest door", outcome="death"),
+            ]
         fix_choices(turn)
 
     add_message("model", turn.model_dump_json())
     st.session_state.turns.append(turn)
     return True
+
+
+def story_stage(choices_made):
+    """Tell Gemini where we are in the story so it doesn't rush the ending."""
+    left = CHOICES_TO_SURVIVE - choices_made
+    progress = choices_made / CHOICES_TO_SURVIVE
+    if progress < 0.4:
+        return f"STAGE: beginning. The goal is still far away. {left} choices left."
+    if progress < 0.75:
+        return f"STAGE: middle. Things get worse; reveal the twist soon. {left} choices left."
+    return (f"STAGE: close to the goal, but NOT there yet. Add a final obstacle. "
+            f"{left} choices left. Do NOT let the player escape yet.")
 
 
 def make_choice(choice):
@@ -289,6 +331,8 @@ def make_choice(choice):
         f"OUTCOME: {result}\n"
         f"This was choice {choices_made} of {CHOICES_TO_SURVIVE}."
     )
+    if ending is None:
+        message += "\n" + story_stage(choices_made) + " Give 3 new choices."
 
     if take_turn(message, ending):
         st.session_state.health = max(0, st.session_state.health - damage)
@@ -363,9 +407,22 @@ def restart_game():
     st.rerun()
 
 
+def show_end_clip(filename, fallback_drawing, title, color):
+    """Show the clip from the assets folder, or the built-in drawing if it's missing."""
+    path = ASSETS_FOLDER / filename
+    if path.exists():
+        if path.suffix.lower() in (".mp4", ".mov", ".webm"):
+            st.video(str(path), autoplay=True, loop=True, muted=True)
+        else:
+            st.image(str(path))
+        st.html(POPUP_STYLE + f'<div class="end-art"><h1 style="color:{color};">{title}</h1></div>')
+    else:
+        st.html(POPUP_STYLE + fallback_drawing)
+
+
 @st.dialog("💀 Game over")
 def death_popup():
-    st.html(POPUP_STYLE + ZOMBIE_SVG)
+    show_end_clip(LOSE_CLIP, ZOMBIE_SVG, "YOU DIED", "#d7263d")
     st.write(f"You lasted **{len(st.session_state.picks)}** of {CHOICES_TO_SURVIVE} choices.")
     if st.button("🔄 Play again", type="primary", use_container_width=True, key="popup_again_dead"):
         restart_game()
@@ -373,7 +430,7 @@ def death_popup():
 
 @st.dialog("🚁 Rescued!")
 def win_popup():
-    st.html(POPUP_STYLE + RESCUE_SVG)
+    show_end_clip(WIN_CLIP, RESCUE_SVG, "YOU SURVIVED!", "#2a9d8f")
     st.write(f"You made all **{CHOICES_TO_SURVIVE}** choices and escaped the city.")
     if st.button("🔄 Play again", type="primary", use_container_width=True, key="popup_again_win"):
         restart_game()
@@ -452,10 +509,13 @@ else:
             else:
                 st.balloons()
                 win_popup()
+        # The clip also stays on the page after the pop-up is closed
         if st.session_state.ending == "dead":
-            st.error(f"💀 YOU DIED after {choices_made} choices.")
+            show_end_clip(LOSE_CLIP, ZOMBIE_SVG, "YOU DIED", "#d7263d")
+            st.error(f"💀 You lasted {choices_made} choices.")
         else:
-            st.success("🚁 YOU SURVIVED! You made it to the rescue point.")
+            show_end_clip(WIN_CLIP, RESCUE_SVG, "YOU SURVIVED!", "#2a9d8f")
+            st.success("🚁 You made it to the rescue point.")
         if st.button("🔄 Play again", type="primary"):
             restart_game()
 
